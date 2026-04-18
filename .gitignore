@@ -3,3 +3,4 @@
 TECHNICAL_ARCHITECTURE_PLAN.md
 ```
 node_modules
+node_modules/*
