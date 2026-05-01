@@ -31,14 +31,14 @@ export interface Trip {
 export interface Booking {
   _id: string;
   userId: string;
-  tripId: string;
-  trip?: Trip; // populated
-  bookingDate: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  startDate: string;
+  numberOfDays: number;
+  numberOfPeople: number;
+  selectedAreas: string[];
+  comboName?: string;
+  pricePerPersonPerDay: number;
   totalPrice: number;
-  paymentStatus: 'pending' | 'paid' | 'refunded';
-  numberOfTravelers: number;
-  specialRequests?: string;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   createdAt: string;
 }
 
@@ -76,3 +76,4 @@ export interface ApiError {
   message: string;
   errors?: any;
 }
+

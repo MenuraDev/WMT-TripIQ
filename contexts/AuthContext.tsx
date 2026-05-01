@@ -2,10 +2,10 @@
 // TripIQ - Authentication Context
 // ============================================
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User } from '@/types';
 import { authAPI } from '@/services/api';
+import { User } from '@/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
 interface AuthContextType {
   user: User | null;
@@ -44,16 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async (email: string, password: string) => {
-    try {
-      const response = await authAPI.login({ email, password });
-      setUser(response.user);
-    } catch (error: any) {
-      const message = error.response?.data?.message || 'Login failed. Please try again.';
-      throw new Error(message);
-    }
-  };
-
+const login = async (email: string, password: string) => {
+  try {
+    const response = await authAPI.login(email, password);   // ← Fixed
+    setUser(response.user);
+  } catch (error: any) {
+    const message = error.response?.data?.message || 'Login failed. Please try again.';
+    throw new Error(message);
+  }
+};
   const register = async (name: string, email: string, password: string, phone?: string) => {
     try {
       const response = await authAPI.register({ name, email, password, phone });

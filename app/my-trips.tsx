@@ -1,23 +1,21 @@
-// ============================================
-// TripIQ - My Trips Screen (User Dashboard - CRUD)
-// ============================================
-
-import { BorderRadius, Colors, FontSizes, Fonts, Shadows, Spacing } from '@/constants/theme';
+import { BorderRadius, Colors, FontSizes, Shadows, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { bookingAPI, tripAPI } from '@/services/api';
-import { Booking, Trip } from '@/types';
+import { bookingAPI } from '@/services/api';
+import { Booking } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
+  ActivityIndicator, Alert,
   FlatList,
+  Modal,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 
 export default function MyTripsScreen() {
@@ -25,22 +23,25 @@ export default function MyTripsScreen() {
   const router = useRouter();
 
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [availableTrips, setAvailableTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'my' | 'book'>('my');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
 
-  const loadData = async () => {
+  // Edit form states
+  const [editDays, setEditDays] = useState(3);
+  const [editPeople, setEditPeople] = useState(2);
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editAreas, setEditAreas] = useState<string[]>([]);
+
+  const loadBookings = async () => {
     try {
-      const [myBookings, allTrips] = await Promise.all([
-        bookingAPI.getMyBookings(),
-        tripAPI.getAllTrips(),
-      ]);
-      setBookings(myBookings);
-      setAvailableTrips(allTrips);
-    } catch (error: any) {
-      console.error('Error loading data:', error);
-      Alert.alert('Error', 'Failed to load trips. Please check your connection.');
+      const data = await bookingAPI.getMyBookings();
+      // Only show non-cancelled bookings
+      const activeBookings = data.filter((b: Booking) => b.status !== 'cancelled');
+      setBookings(activeBookings);
+    } catch (error) {
+      console.error(error);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -48,387 +49,310 @@ export default function MyTripsScreen() {
   };
 
   useEffect(() => {
-    loadData();
+    loadBookings();
   }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadData();
+    loadBookings();
   };
 
-  const handleBookTrip = async (trip: Trip) => {
+  // ==================== HARD DELETE ====================
+  const handleDelete = (id: string) => {
     Alert.alert(
-      'Book Trip',
-      `Book "${trip.title}" for LKR ${trip.price.toLocaleString()}?`,
+      "Delete Booking",
+      "This will permanently delete this booking from the database. Are you sure?",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Book Now',
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
             try {
-              await bookingAPI.createBooking({
-                tripId: trip._id,
-                numberOfTravelers: 1,
-              });
-              Alert.alert('Success', 'Trip booked successfully!');
-              loadData();
-              setActiveTab('my');
-            } catch (error: any) {
-              Alert.alert('Booking Failed', error.response?.data?.message || 'Please try again.');
+              await bookingAPI.deleteBooking(id);
+              Alert.alert("Success", "Booking deleted permanently");
+              loadBookings();
+            } catch (e) {
+              Alert.alert("Error", "Failed to delete booking");
             }
-          },
-        },
+          }
+        }
       ]
     );
   };
 
-  const handleCancelBooking = (booking: Booking) => {
-    Alert.alert(
-      'Cancel Booking',
-      'Are you sure you want to cancel this booking?',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Yes, Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await bookingAPI.cancelBooking(booking._id);
-              Alert.alert('Cancelled', 'Booking cancelled successfully.');
-              loadData();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to cancel booking.');
-            }
-          },
-        },
-      ]
-    );
+  // ==================== EDIT ====================
+  const openEditModal = (booking: Booking) => {
+    setEditingBooking(booking);
+    setEditDays(booking.numberOfDays || 3);
+    setEditPeople(booking.numberOfPeople || 2);
+    setEditStartDate(booking.startDate || '');
+    setEditAreas(booking.selectedAreas || []);
+    setShowEditModal(true);
   };
 
-  const renderMyBooking = ({ item }: { item: Booking }) => (
-    <View style={styles.bookingCard}>
-      <View style={styles.bookingHeader}>
-        <Text style={styles.tripTitle} numberOfLines={1}>
-          {item.trip?.title || 'Trip'}
+  const handleSaveEdit = async () => {
+    if (!editingBooking) return;
+
+    try {
+      const updatedData = {
+        numberOfDays: editDays,
+        numberOfPeople: editPeople,
+        startDate: editStartDate,
+        selectedAreas: editAreas,
+      };
+
+      await bookingAPI.updateBooking(editingBooking._id, updatedData);
+      Alert.alert("Success", "Booking updated successfully!");
+      setShowEditModal(false);
+      loadBookings();
+    } catch (error) {
+      Alert.alert("Error", "Failed to update booking");
+    }
+  };
+
+  const toggleArea = (area: string) => {
+    if (editAreas.includes(area)) {
+      setEditAreas(editAreas.filter(a => a !== area));
+    } else {
+      setEditAreas([...editAreas, area]);
+    }
+  };
+
+  const renderBooking = ({ item }: { item: Booking }) => (
+    <View style={styles.card}>
+      <View style={styles.header}>
+        <Text style={styles.title} numberOfLines={1}>
+          {item.selectedAreas?.join(' → ') || 'Trip'}
         </Text>
         <View style={[styles.statusBadge, getStatusStyle(item.status)]}>
           <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
         </View>
       </View>
 
-      <Text style={styles.destination}>{item.trip?.destination}</Text>
+      <Text style={styles.details}>
+        {item.numberOfDays} Days • {item.numberOfPeople} People
+      </Text>
 
-      <View style={styles.bookingDetails}>
-        <View style={styles.detailRow}>
-          <Ionicons name="calendar-outline" size={14} color={Colors.textLight} />
-          <Text style={styles.detailText}>
-            {new Date(item.bookingDate).toLocaleDateString()}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="people-outline" size={14} color={Colors.textLight} />
-          <Text style={styles.detailText}>{item.numberOfTravelers} travelers</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="cash-outline" size={14} color={Colors.textLight} />
-          <Text style={styles.priceText}>LKR {item.totalPrice.toLocaleString()}</Text>
-        </View>
+      <Text style={styles.date}>
+        Starts: {new Date(item.startDate).toLocaleDateString('en-GB')}
+      </Text>
+
+      <View style={styles.priceRow}>
+        <Text style={styles.price}>LKR {item.totalPrice.toLocaleString()}</Text>
       </View>
 
-      {item.status === 'pending' || item.status === 'confirmed' ? (
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => handleCancelBooking(item)}
+      <View style={styles.buttonRow}>
+        <TouchableOpacity 
+          style={styles.editButton} 
+          onPress={() => openEditModal(item)}
         >
-          <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+          <Ionicons name="pencil" size={16} color={Colors.primary} />
+          <Text style={styles.editText}>Edit</Text>
         </TouchableOpacity>
-      ) : null}
-    </View>
-  );
 
-  const renderAvailableTrip = ({ item }: { item: Trip }) => (
-    <TouchableOpacity style={styles.tripCard} onPress={() => handleBookTrip(item)}>
-      <View style={styles.tripInfo}>
-        <Text style={styles.tripTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.destination}>{item.destination}</Text>
-        <Text style={styles.duration}>{item.duration}</Text>
-      </View>
-      <View style={styles.tripRight}>
-        <Text style={styles.price}>LKR {item.price.toLocaleString()}</Text>
-        <TouchableOpacity style={styles.bookButton} onPress={() => handleBookTrip(item)}>
-          <Text style={styles.bookButtonText}>Book</Text>
+        <TouchableOpacity 
+          style={styles.deleteButton} 
+          onPress={() => handleDelete(item._id)}
+        >
+          <Ionicons name="trash" size={16} color="#ef4444" />
+          <Text style={styles.deleteText}>Delete</Text>
         </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
   if (isLoading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Loading your trips...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Tabs */}
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'my' && styles.activeTab]}
-          onPress={() => setActiveTab('my')}
-        >
-          <Text style={[styles.tabText, activeTab === 'my' && styles.activeTabText]}>
-            My Bookings ({bookings.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'book' && styles.activeTab]}
-          onPress={() => setActiveTab('book')}
-        >
-          <Text style={[styles.tabText, activeTab === 'book' && styles.activeTabText]}>
-            Book New Trip
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {activeTab === 'my' ? (
-        bookings.length > 0 ? (
-          <FlatList
-            data={bookings}
-            renderItem={renderMyBooking}
-            keyExtractor={(item) => item._id}
-            contentContainerStyle={styles.list}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          />
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="airplane-outline" size={60} color={Colors.textLight} />
-            <Text style={styles.emptyTitle}>No bookings yet</Text>
-            <Text style={styles.emptyText}>Start exploring and book your first trip!</Text>
-            <TouchableOpacity
-              style={styles.exploreButton}
-              onPress={() => setActiveTab('book')}
+      <FlatList
+        data={bookings}
+        renderItem={renderBooking}
+        keyExtractor={(item) => item._id}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Ionicons name="airplane-outline" size={60} color="#ccc" />
+            <Text style={styles.emptyText}>No active bookings</Text>
+            <TouchableOpacity 
+              style={styles.bookNowBtn} 
+              onPress={() => router.push('/(tabs)/book-trip')}
             >
-              <Text style={styles.exploreButtonText}>Explore Trips</Text>
+              <Text style={styles.bookNowText}>Book Your First Trip</Text>
             </TouchableOpacity>
           </View>
-        )
-      ) : (
-        <FlatList
-          data={availableTrips}
-          renderItem={renderAvailableTrip}
-          keyExtractor={(item) => item._id}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        />
-      )}
+        }
+      />
+
+      {/* ==================== FULL EDIT MODAL ==================== */}
+      <Modal visible={showEditModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ScrollView>
+              <Text style={styles.modalTitle}>Edit Booking</Text>
+
+              {/* Days */}
+              <Text style={styles.inputLabel}>Number of Days</Text>
+              <View style={styles.daysRow}>
+                {[1,2,3,4,5,6,7,8,9].map(day => (
+                  <TouchableOpacity
+                    key={day}
+                    style={[styles.dayBtn, editDays === day && styles.dayBtnActive]}
+                    onPress={() => setEditDays(day)}
+                  >
+                    <Text style={[styles.dayText, editDays === day && styles.dayTextActive]}>
+                      {day}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* People */}
+              <Text style={styles.inputLabel}>Number of People</Text>
+              <View style={styles.peopleRow}>
+                <TouchableOpacity 
+                  style={styles.peopleBtn} 
+                  onPress={() => setEditPeople(Math.max(1, editPeople - 1))}
+                >
+                  <Ionicons name="remove" size={22} color={Colors.primary} />
+                </TouchableOpacity>
+                <Text style={styles.peopleCount}>{editPeople}</Text>
+                <TouchableOpacity 
+                  style={styles.peopleBtn} 
+                  onPress={() => setEditPeople(Math.min(20, editPeople + 1))}
+                >
+                  <Ionicons name="add" size={22} color={Colors.primary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Start Date */}
+              <Text style={styles.inputLabel}>Start Date (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.input}
+                value={editStartDate}
+                onChangeText={setEditStartDate}
+                placeholder="2026-05-10"
+              />
+
+              {/* Areas */}
+              <Text style={styles.inputLabel}>Selected Areas</Text>
+              <View style={styles.areasContainer}>
+                {['Anuradhapura', 'Polonnaruwa', 'Sigiriya', 'Negambo', 'Colombo', 'Puttalama'].map(area => (
+                  <TouchableOpacity
+                    key={area}
+                    style={[styles.areaChip, editAreas.includes(area) && styles.areaChipActive]}
+                    onPress={() => toggleArea(area)}
+                  >
+                    <Text style={[styles.areaText, editAreas.includes(area) && styles.areaTextActive]}>
+                      {area}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={styles.modalCancelBtn} 
+                  onPress={() => setShowEditModal(false)}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.modalSaveBtn} 
+                  onPress={handleSaveEdit}
+                >
+                  <Text style={styles.modalSaveText}>Save Changes</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 function getStatusStyle(status: string) {
-  switch (status) {
-    case 'confirmed':
-      return { backgroundColor: '#d1fae5' };
-    case 'pending':
-      return { backgroundColor: '#fef3c7' };
-    case 'cancelled':
-      return { backgroundColor: '#fee2e2' };
-    case 'completed':
-      return { backgroundColor: '#dbeafe' };
-    default:
-      return { backgroundColor: '#4ef0cd'};
-  }
+  if (status === 'confirmed') return { backgroundColor: '#d1fae5' };
+  if (status === 'pending') return { backgroundColor: '#fef3c7' };
+  return { backgroundColor: '#e5e7eb' };
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
+  container: { flex: 1, backgroundColor: Colors.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  list: { padding: Spacing.md },
+  card: { 
+    backgroundColor: '#fff', 
+    borderRadius: BorderRadius.lg, 
+    padding: Spacing.lg, 
+    marginBottom: Spacing.md,
+    ...Shadows.card 
   },
-  center: {
-    flex: 1,
+  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.sm },
+  title: { fontSize: FontSizes.lg, fontWeight: '600', flex: 1, color: Colors.textDark },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  details: { color: Colors.textLight, marginBottom: 4 },
+  date: { color: Colors.textLight, fontSize: 14 },
+  priceRow: { marginTop: Spacing.sm },
+  price: { fontSize: 18, fontWeight: '700', color: Colors.primary },
+  buttonRow: { flexDirection: 'row', marginTop: Spacing.md, gap: 10 },
+  editButton: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
     justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#e8f5e9', 
+    padding: 12, 
+    borderRadius: BorderRadius.md 
   },
-  loadingText: {
-    marginTop: Spacing.md,
-    fontSize: FontSizes.md,
-    color: Colors.textLight,
-  },
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: '#4ef0cd',
-    padding: 4,
-    margin: Spacing.md,
-    borderRadius: BorderRadius.lg,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: Spacing.sm,
-    alignItems: 'center',
-    borderRadius: BorderRadius.md,
-  },
-  activeTab: {
-    backgroundColor: Colors.primary,
-  },
-  tabText: {
-    fontSize: FontSizes.sm,
-    fontFamily: Fonts.body,
-    color: Colors.textLight,
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  list: {
-    padding: Spacing.md,
-  },
-  bookingCard: {
-    backgroundColor: '#4ef0cd',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-    ...Shadows.card,
-  },
-  bookingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  tripTitle: {
-    fontSize: FontSizes.lg,
-    fontFamily: Fonts.heading,
-    color: Colors.textDark,
-    fontWeight: '600',
-    flex: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
-  },
-  statusText: {
-    fontSize: FontSizes.xs,
-    fontFamily: Fonts.heading,
-    fontWeight: '600',
-    color: Colors.textDark,
-  },
-  destination: {
-    fontSize: FontSizes.md,
-    fontFamily: Fonts.body,
-    color: Colors.textLight,
-    marginBottom: Spacing.sm,
-  },
-  bookingDetails: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  detailText: {
-    fontSize: FontSizes.sm,
-    fontFamily: Fonts.body,
-    color: Colors.textLight,
-  },
-  priceText: {
-    fontSize: FontSizes.sm,
-    fontFamily: Fonts.heading,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    backgroundColor: '#fee2e2',
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#4ef0cd',
-    fontSize: FontSizes.sm,
-    fontFamily: Fonts.heading,
-    fontWeight: '600',
-  },
-  tripCard: {
-    backgroundColor: '#4ef0cd',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    ...Shadows.card,
-  },
-  tripInfo: {
-    flex: 1,
-  },
-  duration: {
-    fontSize: FontSizes.sm,
-    fontFamily: Fonts.body,
-    color: Colors.textLight,
-    marginTop: 2,
-  },
-  tripRight: {
-    alignItems: 'flex-end',
-  },
-  price: {
-    fontSize: FontSizes.lg,
-    fontFamily: Fonts.heading,
-    color: Colors.primary,
-    fontWeight: '700',
-  },
-  bookButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    marginTop: Spacing.sm,
-  },
-  bookButtonText: {
-    color: '#fff',
-    fontSize: FontSizes.sm,
-    fontFamily: Fonts.heading,
-    fontWeight: '600',
-  },
-  emptyState: {
-    flex: 1,
+  editText: { color: Colors.primary, fontWeight: '600', marginLeft: 6 },
+  deleteButton: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xl,
+    backgroundColor: '#fee2e2', 
+    padding: 12, 
+    borderRadius: BorderRadius.md 
   },
-  emptyTitle: {
-    fontSize: FontSizes.xl,
-    fontFamily: Fonts.heading,
-    color: Colors.textDark,
-    marginTop: Spacing.md,
-  },
-  emptyText: {
-    fontSize: FontSizes.md,
-    fontFamily: Fonts.body,
-    color: Colors.textLight,
-    textAlign: 'center',
-    marginTop: Spacing.sm,
-  },
-  exploreButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginTop: Spacing.lg,
-  },
-  exploreButtonText: {
-    color: '#fff',
-    fontSize: FontSizes.md,
-    fontFamily: Fonts.heading,
-    fontWeight: '600',
-  },
+  deleteText: { color: '#ef4444', fontWeight: '600', marginLeft: 6 },
+  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
+  emptyText: { fontSize: 18, color: '#888', marginTop: 16 },
+  bookNowBtn: { backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 25, marginTop: 20 },
+  bookNowText: { color: '#fff', fontWeight: '600' },
+
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: '#fff', padding: 20, borderRadius: 16, width: '92%', maxHeight: '85%' },
+  modalTitle: { fontSize: 22, fontWeight: '700', marginBottom: 20, textAlign: 'center', color: Colors.textDark },
+  inputLabel: { fontSize: 15, fontWeight: '600', marginBottom: 8, color: Colors.textDark, marginTop: 12 },
+  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 14, fontSize: 16, marginBottom: 8 },
+  daysRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  dayBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f1f1f1' },
+  dayBtnActive: { backgroundColor: Colors.primary },
+  dayText: { fontSize: 15, color: Colors.textDark },
+  dayTextActive: { color: '#fff', fontWeight: '600' },
+  peopleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 12 },
+  peopleBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#f1f1f1', justifyContent: 'center', alignItems: 'center' },
+  peopleCount: { fontSize: 26, fontWeight: '700', color: Colors.textDark, minWidth: 50, textAlign: 'center' },
+  areasContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  areaChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: '#f1f1f1' },
+  areaChipActive: { backgroundColor: Colors.primary },
+  areaText: { fontSize: 14, color: Colors.textDark },
+  areaTextActive: { color: '#fff', fontWeight: '600' },
+  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  modalCancelBtn: { flex: 1, backgroundColor: '#f1f1f1', padding: 15, borderRadius: 12, alignItems: 'center' },
+  modalCancelText: { fontWeight: '600', color: '#666', fontSize: 16 },
+  modalSaveBtn: { flex: 1, backgroundColor: Colors.primary, padding: 15, borderRadius: 12, alignItems: 'center' },
+  modalSaveText: { fontWeight: '600', color: '#fff', fontSize: 16 },
 });
