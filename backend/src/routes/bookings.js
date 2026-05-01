@@ -1,67 +1,63 @@
 const express = require('express');
 const Booking = require('../models/Booking');
-const Trip = require('../models/Trip');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
-// @route   GET /api/bookings/my
+// GET /api/bookings/my
 router.get('/my', protect, async (req, res) => {
   try {
-    const bookings = await Booking.find({ userId: req.user._id })
-      .populate('tripId')
-      .sort({ createdAt: -1 });
-
-    // Map to include trip details
-    const formatted = bookings.map((b) => ({
-      ...b.toObject(),
-      trip: b.tripId,
-    }));
-
-    res.json({ success: true, bookings: formatted });
+    const bookings = await Booking.find({ userId: req.user._id }).sort({ createdAt: -1 });
+    res.json({ success: true, bookings });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// @route   POST /api/bookings
+// POST /api/bookings (Create Booking)
 router.post('/', protect, async (req, res) => {
   try {
-    const { tripId, numberOfTravelers = 1, specialRequests } = req.body;
+    const {
+      numberOfDays,
+      startDate,
+      numberOfPeople,
+      selectedAreas,
+      comboName,
+      pricePerPersonPerDay,
+      totalPrice
+    } = req.body;
 
-    const trip = await Trip.findById(tripId);
-    if (!trip) {
-      return res.status(404).json({ success: false, message: 'Trip not found' });
+    if (!numberOfDays || !startDate || !numberOfPeople || !selectedAreas || !totalPrice) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
+      });
     }
-
-    if (trip.status !== 'available') {
-      return res.status(400).json({ success: false, message: 'Trip is not available' });
-    }
-
-    const totalPrice = trip.price * numberOfTravelers;
 
     const booking = await Booking.create({
       userId: req.user._id,
-      tripId,
+      numberOfDays,
+      startDate,
+      numberOfPeople,
+      selectedAreas,
+      comboName: comboName || null,
+      pricePerPersonPerDay,
       totalPrice,
-      numberOfTravelers,
-      specialRequests,
-      status: 'pending',
+      status: 'pending'
     });
-
-    const populated = await booking.populate('tripId');
 
     res.status(201).json({
       success: true,
-      booking: { ...populated.toObject(), trip: populated.tripId },
+      booking
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Create booking error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to create booking' });
   }
 });
 
-// @route   PATCH /api/bookings/:id/cancel
-router.patch('/:id/cancel', protect, async (req, res) => {
+// PUT /api/bookings/:id (Update Booking)
+router.put('/:id', protect, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
@@ -72,9 +68,49 @@ router.patch('/:id/cancel', protect, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
+    const updated = await Booking.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+
+    res.json({ success: true, booking: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// DELETE /api/bookings/:id (Hard Delete)
+router.delete('/:id', protect, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    if (booking.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    await Booking.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Booking deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// PATCH /api/bookings/:id/cancel (Keep for backward compatibility)
+router.patch('/:id/cancel', protect, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+
+    if (booking.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
     booking.status = 'cancelled';
     await booking.save();
-
     res.json({ success: true, booking });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

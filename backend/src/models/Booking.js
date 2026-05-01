@@ -7,37 +7,51 @@ const bookingSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    // Old fields (optional for backward compatibility)
     tripId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Trip',
-      required: true,
+      required: false,
     },
-    bookingDate: {
-      type: Date,
-      default: Date.now,
+    numberOfTravelers: {
+      type: Number,
+      required: false,
+      default: 1,
     },
-    status: {
+
+    // New fields for Book Trip feature
+    numberOfDays: {
+      type: Number,
+      required: false,
+    },
+    startDate: {
       type: String,
-      enum: ['pending', 'confirmed', 'cancelled', 'completed'],
-      default: 'pending',
+      required: false,
+    },
+    numberOfPeople: {
+      type: Number,
+      required: false,
+    },
+    selectedAreas: {
+      type: [String],
+      required: false,
+    },
+    comboName: {
+      type: String,
+      required: false,
+    },
+    pricePerPersonPerDay: {
+      type: Number,
+      required: false,
     },
     totalPrice: {
       type: Number,
       required: true,
     },
-    numberOfTravelers: {
-      type: Number,
-      required: true,
-      min: 1,
-    },
-    paymentStatus: {
+    status: {
       type: String,
-      enum: ['pending', 'paid', 'refunded'],
+      enum: ['pending', 'confirmed', 'cancelled', 'completed'],
       default: 'pending',
-    },
-    specialRequests: {
-      type: String,
-      trim: true,
     },
   },
   { timestamps: true }
