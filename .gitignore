@@ -1,6 +1,16 @@
 ```
 # Dependencies
 node_modules/
+components/
+database/
+.next/
+public/
+hooks/
+models/
+routes/
+utils/
+app.py
+src/
 
 # Build outputs
 dist/
