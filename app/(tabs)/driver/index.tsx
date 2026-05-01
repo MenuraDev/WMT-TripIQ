@@ -3,17 +3,23 @@ import { apiService } from '@/services/api';
 import { Booking, DriverProfile } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  Animated,
+  Dimensions,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const { width } = Dimensions.get('window');
 
 const driverId = 'driver-1';
 
@@ -21,22 +27,42 @@ export default function DriverDashboardScreen() {
   const navigation = useNavigation<any>();
   const [isAvailable, setIsAvailable] = useState(false);
   const [isAvailabilityUpdating, setIsAvailabilityUpdating] = useState(false);
+  const [showQuickNavMenu, setShowQuickNavMenu] = useState(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [activeTrip, setActiveTrip] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<DriverProfile | null>(null);
+
+  const slideAnim = useRef(new Animated.Value(width)).current;
 
   useEffect(() => {
     loadDriverProfile();
     loadDashboardData();
   }, []);
 
+  useEffect(() => {
+    if (showQuickNavMenu) {
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: width,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showQuickNavMenu]);
+
   const loadDashboardData = async () => {
     try {
       setLoading(true);
       const bookingsData = await apiService.getDriverBookings(driverId);
-      setBookings(bookingsData);
-      setActiveTrip(bookingsData.find(b => ['accepted', 'in_progress'].includes(b.status)) || null);
+      const safeBookingsData = bookingsData || [];
+      setBookings(safeBookingsData);
+      setActiveTrip(safeBookingsData.find(b => ['accepted', 'in_progress'].includes(b.status)) || null);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
       Alert.alert('Error', 'Failed to load dashboard data');
@@ -97,9 +123,9 @@ export default function DriverDashboardScreen() {
     }
   };
 
-  const pendingBookings = bookings.filter(b => b.status === 'pending');
-  const completedTrips = bookings.filter(b => b.status === 'completed').length;
-  const totalAssigned = bookings.length;
+  const pendingBookings = (bookings || []).filter(b => b.status === 'pending');
+  const completedTrips = (bookings || []).filter(b => b.status === 'completed').length;
+  const totalAssigned = (bookings || []).length;
   const driverName = profile?.name ?? 'John Doe';
 
   const renderBookingCard = (booking: Booking) => (
@@ -165,10 +191,18 @@ export default function DriverDashboardScreen() {
               <Text style={styles.welcomeText}>Welcome back, {driverName}!</Text>
               <Text style={styles.subTitle}>Your driver dashboard is ready.</Text>
             </View>
-            <View style={[styles.availabilityPill, isAvailable ? styles.availabilityPillOnline : styles.availabilityPillOffline]}>
-              <Text style={styles.availabilityPillText}>
-                {isAvailable ? 'Online' : 'Offline'}
-              </Text>
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                style={styles.quickNavToggle}
+                onPress={() => setShowQuickNavMenu(true)}
+              >
+                <Ionicons name="menu" size={24} color={Colors.primary} />
+              </TouchableOpacity>
+              <View style={[styles.availabilityPill, isAvailable ? styles.availabilityPillOnline : styles.availabilityPillOffline]}>
+                <Text style={styles.availabilityPillText}>
+                  {isAvailable ? 'Online' : 'Offline'}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -186,45 +220,9 @@ export default function DriverDashboardScreen() {
             />
           </View>
 
-          <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Ionicons name="document-text" size={18} color={Colors.primary} style={styles.statIcon} />
-              <Text style={styles.statNumber}>{totalAssigned}</Text>
-              <Text style={styles.statLabel}>Assigned</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="time" size={18} color={Colors.primary} style={styles.statIcon} />
-              <Text style={styles.statNumber}>{pendingBookings.length}</Text>
-              <Text style={styles.statLabel}>Pending</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="checkmark-done" size={18} color={Colors.primary} style={styles.statIcon} />
-              <Text style={styles.statNumber}>{completedTrips}</Text>
-              <Text style={styles.statLabel}>Completed</Text>
-            </View>
-          </View>
         </View>
 
-        <View style={styles.quickNavRow}>
-          <TouchableOpacity style={styles.quickNavItem} onPress={() => navigation.navigate('my-trips')}>
-            <View style={styles.quickNavIconWrapper}>
-              <Ionicons name="list" size={20} color={Colors.primary} />
-            </View>
-            <Text style={styles.quickNavText}>My Trips</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickNavItem} onPress={() => navigation.navigate('profile')}>
-            <View style={styles.quickNavIconWrapper}>
-              <Ionicons name="person" size={20} color={Colors.primary} />
-            </View>
-            <Text style={styles.quickNavText}>Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickNavItem} onPress={() => navigation.navigate('reviews')}>
-            <View style={styles.quickNavIconWrapper}>
-              <Ionicons name="star" size={20} color={Colors.primary} />
-            </View>
-            <Text style={styles.quickNavText}>Reviews</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Removed statsContainer and quickNavSection from here */}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Active Trip</Text>
@@ -276,7 +274,67 @@ export default function DriverDashboardScreen() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+
+      {/* Side Menu Modal */}
+      <Modal visible={showQuickNavMenu} transparent animationType="none" onRequestClose={() => setShowQuickNavMenu(false)}>
+        <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback onPress={() => setShowQuickNavMenu(false)}>
+            <View style={styles.modalBackground} />
+          </TouchableWithoutFeedback>
+          <Animated.View style={[styles.sideMenu, { transform: [{ translateX: slideAnim }] }]}>
+            <View style={styles.sideMenuHeader}>
+              <Text style={styles.sideMenuTitle}>Menu</Text>
+              <TouchableOpacity onPress={() => setShowQuickNavMenu(false)}>
+                <Ionicons name="close" size={24} color={Colors.textDark} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.sideMenuSectionTitle}>Statistics</Text>
+              <View style={styles.sideStatsContainer}>
+                <View style={styles.sideStatCard}>
+                  <Ionicons name="document-text" size={22} color={Colors.primary} style={styles.statIcon} />
+                  <View style={styles.sideStatText}>
+                    <Text style={styles.statNumber}>{totalAssigned}</Text>
+                    <Text style={styles.statLabel}>Assigned</Text>
+                  </View>
+                </View>
+                <View style={styles.sideStatCard}>
+                  <Ionicons name="time" size={22} color={Colors.primary} style={styles.statIcon} />
+                  <View style={styles.sideStatText}>
+                    <Text style={styles.statNumber}>{pendingBookings.length}</Text>
+                    <Text style={styles.statLabel}>Pending</Text>
+                  </View>
+                </View>
+                <View style={styles.sideStatCard}>
+                  <Ionicons name="checkmark-done" size={22} color={Colors.primary} style={styles.statIcon} />
+                  <View style={styles.sideStatText}>
+                    <Text style={styles.statNumber}>{completedTrips}</Text>
+                    <Text style={styles.statLabel}>Completed</Text>
+                  </View>
+                </View>
+              </View>
+
+              <Text style={styles.sideMenuSectionTitle}>Quick Links</Text>
+              <View style={styles.sideNavMenu}>
+                <TouchableOpacity style={styles.sideNavOption} onPress={() => { setShowQuickNavMenu(false); navigation.navigate('my-trips'); }}>
+                  <Ionicons name="list" size={20} color={Colors.primary} />
+                  <Text style={styles.sideNavText}>My Trips</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.sideNavOption} onPress={() => { setShowQuickNavMenu(false); navigation.navigate('profile'); }}>
+                  <Ionicons name="person" size={20} color={Colors.primary} />
+                  <Text style={styles.sideNavText}>Profile</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.sideNavOption} onPress={() => { setShowQuickNavMenu(false); navigation.navigate('reviews'); }}>
+                  <Ionicons name="star" size={20} color={Colors.primary} />
+                  <Text style={styles.sideNavText}>Reviews</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </Animated.View>
+        </View>
+      </Modal>
+    </SafeAreaView >
   );
 }
 
@@ -355,16 +413,19 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     color: Colors.textLight,
   },
+  headerRight: {
+    alignItems: 'flex-end',
+  },
   statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    width: '100%',
   },
   statCard: {
-    flex: 1,
+    width: '100%',
     backgroundColor: Colors.backgroundLight,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
-    marginRight: Spacing.sm,
+    marginBottom: Spacing.sm,
     alignItems: 'center',
   },
   statIcon: {
@@ -382,30 +443,56 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     textAlign: 'center',
   },
-  quickNavRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  quickNavSection: {
+    alignItems: 'flex-end',
     marginBottom: Spacing.xl,
   },
-  quickNavItem: {
-    flex: 1,
+  quickNavToggle: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.full,
     backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    marginRight: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.grayLight,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: Spacing.sm,
     ...Shadows.small,
   },
-  quickNavIconWrapper: {
-    width: 44,
-    height: 44,
+  quickNavMenu: {
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.sm,
+    width: '100%',
+    maxWidth: 320,
+    shadowColor: Colors.textDark,
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  quickNavOption: {
+    alignItems: 'center',
+    width: 72,
+  },
+  quickNavCircle: {
+    width: 56,
+    height: 56,
     borderRadius: BorderRadius.full,
     backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.xs,
+  },
+  quickNavCircleText: {
+    textAlign: 'center',
+    fontSize: FontSizes.sm,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textDark,
   },
   quickNavText: {
     marginTop: Spacing.xs,
@@ -575,5 +662,72 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     fontFamily: Fonts.bodyMedium,
     marginLeft: Spacing.xs,
+  },
+  modalOverlay: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  modalBackground: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  sideMenu: {
+    width: width * 0.75,
+    maxWidth: 300,
+    backgroundColor: Colors.white,
+    height: '100%',
+    padding: Spacing.lg,
+    ...Shadows.card,
+  },
+  sideMenuHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+    marginTop: Spacing.xl,
+  },
+  sideMenuTitle: {
+    fontSize: FontSizes.lg,
+    fontFamily: Fonts.heading,
+    color: Colors.textDark,
+  },
+  sideMenuSectionTitle: {
+    fontSize: FontSizes.md,
+    fontFamily: Fonts.heading,
+    color: Colors.textLight,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  sideStatsContainer: {
+    flexDirection: 'column',
+    width: '100%',
+    marginBottom: Spacing.lg,
+  },
+  sideStatCard: {
+    flexDirection: 'row',
+    padding: Spacing.md,
+    backgroundColor: Colors.backgroundLight,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.sm,
+    alignItems: 'center',
+  },
+  sideStatText: {
+    marginLeft: Spacing.md,
+  },
+  sideNavMenu: {
+    marginTop: Spacing.sm,
+  },
+  sideNavOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.grayLight,
+  },
+  sideNavText: {
+    fontSize: FontSizes.md,
+    fontFamily: Fonts.bodyMedium,
+    color: Colors.textDark,
+    marginLeft: Spacing.md,
   },
 });
