@@ -1,46 +1,78 @@
-// Types for SurangaTours app
+// ============================================
+// TripIQ - TypeScript Types (User Dashboard Focus)
+// ============================================
 
-export interface Itinerary {
-  id: string;
+export interface User {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  profileImage?: string;
+  role: 'user' | 'admin' | 'driver';
+  createdAt: string;
+}
+
+export interface Trip {
+  _id: string;
   title: string;
   destination: string;
   duration: string;
   price: number;
-  rating: number;
   imageUrl: string;
-  description?: string;
+  description: string;
+  startDate?: string;
+  endDate?: string;
+  maxPeople?: number;
+  status: 'available' | 'full' | 'cancelled';
+  createdBy?: string;
+  createdAt: string;
 }
 
-export interface Destination {
-  id: string;
-  name: string;
-  imageUrl: string;
-  description?: string;
+export interface Booking {
+  _id: string;
+  userId: string;
+  tripId: string;
+  trip?: Trip; // populated
+  bookingDate: string;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  totalPrice: number;
+  paymentStatus: 'pending' | 'paid' | 'refunded';
+  numberOfTravelers: number;
+  specialRequests?: string;
+  createdAt: string;
 }
 
 export interface Review {
-  id: string;
-  userName: string;
-  userAvatar?: string;
+  _id: string;
+  userId: string;
+  userName?: string;
+  tripId: string;
   rating: number;
   comment: string;
-  date: string;
-  destination?: string;
+  createdAt: string;
 }
 
-export interface ServiceCard {
-  id: string;
-  title: string;
-  icon: string;
-  description: string;
-}
-
-export interface Vehicle {
-  id: string;
+export interface Destination {
+  _id: string;
   name: string;
-  type: string;
-  capacity: number;
-  pricePerDay: number;
+  description: string;
   imageUrl: string;
-  rating?: number;
+  location: string;
+  category: 'beach' | 'hill' | 'cultural' | 'wildlife' | 'city';
+  rating: number;
+  priceLevel: 1 | 2 | 3 | 4 | 5;
+  createdAt: string;
+}
+
+export interface AuthResponse {
+  success: boolean;
+  token: string;
+  user: User;
+  message?: string;
+}
+
+export interface ApiError {
+  success: false;
+  message: string;
+  errors?: any;
 }

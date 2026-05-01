@@ -1,5 +1,6 @@
-import { BorderRadius, Colors, FontSizes, Fonts, Shadows, Spacing } from '@/constants/theme';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Colors, Spacing, FontSizes, Fonts, BorderRadius, Shadows } from '@/constants/theme';
 
 interface CTASectionProps {
   onBookTripPress?: () => void;
@@ -101,5 +102,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-//

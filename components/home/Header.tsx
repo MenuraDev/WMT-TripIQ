@@ -1,7 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { BorderRadius, Colors, FontSizes, Fonts, Shadows, Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, FontSizes, Fonts, Shadows, BorderRadius } from '@/constants/theme';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface HeaderProps {
   onSearchPress?: () => void;
@@ -9,6 +11,9 @@ interface HeaderProps {
 }
 
 export default function Header({ onSearchPress, onNotificationPress }: HeaderProps) {
+  const router = useRouter();
+  const { user, logout } = useAuth();
+
   return (
     <View style={styles.container}>
       <View style={styles.topRow}>
@@ -16,7 +21,40 @@ export default function Header({ onSearchPress, onNotificationPress }: HeaderPro
           <Text style={styles.logo}>SurangaTours</Text>
           <Text style={styles.tagline}>Discover Beautiful Sri Lanka</Text>
         </View>
-        <View style={styles.iconsContainer}>
+
+        <View style={styles.rightSection}>
+          {user ? (
+            <View style={styles.authButtons}>
+              <TouchableOpacity 
+                onPress={() => router.push('/my-trips' as any)}
+                style={styles.authButton}
+              >
+                <Text style={styles.authButtonText}>My Trips</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                onPress={() => router.push('/profile' as any)}
+                style={styles.authButton}
+              >
+                <Text style={styles.authButtonText}>Profile</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                onPress={logout}
+                style={[styles.authButton, { backgroundColor: '#fee2e2' }]}
+              >
+                <Text style={[styles.authButtonText, { color: '#ef4444' }]}>Logout</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              onPress={() => router.push('/auth/login' as any)}
+              style={styles.loginButton}
+            >
+              <Text style={styles.loginButtonText}>Login</Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity onPress={onNotificationPress} style={styles.iconButton}>
             <Ionicons name="notifications-outline" size={24} color={Colors.primary} />
             <View style={styles.badge} />
@@ -57,9 +95,40 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     marginTop: 2,
   },
-  iconsContainer: {
+  rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  authButtons: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginRight: Spacing.sm,
+  },
+  authButton: {
+    backgroundColor: '#e8f5e9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.md,
+  },
+  authButtonText: {
+    fontSize: FontSizes.sm,
+    fontFamily: Fonts.body,
+    color: '#2E7D32',
+    fontWeight: '600',
+  },
+  loginButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.md,
+    marginRight: Spacing.sm,
+  },
+  loginButtonText: {
+    color: '#fff',
+    fontSize: FontSizes.sm,
+    fontFamily: Fonts.heading,
+    fontWeight: '600',
   },
   iconButton: {
     position: 'relative',

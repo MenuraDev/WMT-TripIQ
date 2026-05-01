@@ -1,25 +1,19 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 
-export default function TabsLayout() {
+export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: '#999',
+        tabBarInactiveTintColor: '#888',
         tabBarStyle: {
-          backgroundColor: Colors.white,
+          backgroundColor: '#fff',
           borderTopWidth: 1,
-          borderTopColor: Colors.grayLight,
-          paddingBottom: 8,
-          paddingTop: 8,
+          borderTopColor: '#eee',
           height: 60,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
+          paddingBottom: 8,
         },
         headerShown: false,
       }}
@@ -34,11 +28,11 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="vehicles"
+        name="my-trips"
         options={{
-          title: 'Vehicles',
+          title: 'My Trips',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="car-outline" size={size} color={color} />
+            <Ionicons name="airplane" size={size} color={color} />
           ),
         }}
       />
@@ -47,7 +41,7 @@ export default function TabsLayout() {
         options={{
           title: 'Book Trip',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="sparkles-outline" size={size} color={color} />
+            <Ionicons name="add-circle" size={size} color={color} />
           ),
         }}
       />
@@ -56,7 +50,7 @@ export default function TabsLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+            <Ionicons name="person" size={size} color={color} />
           ),
         }}
       />
