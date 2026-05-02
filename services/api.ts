@@ -1,6 +1,7 @@
 import { Booking, DriverProfile, DriverStats, Review } from '@/types';
 
-const API_BASE_URL = 'https://api.example.com'; // Replace with actual API URL
+const HOST = '192.168.1.60'; // Explicitly using computer's local IP address
+const API_BASE_URL = `http://${HOST}:5000`;
 
 class ApiService {
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -22,46 +23,51 @@ class ApiService {
 
   // Get driver bookings
   async getDriverBookings(driverId: string): Promise<Booking[]> {
-    return this.request<Booking[]>(`/api/bookings/driver/${driverId}`);
+    return [
+      {
+        id: 'b1', customerId: 'c1', pickupLocation: 'Colombo', destination: 'Kandy', 
+        date: '2026-05-02', price: 50, status: 'pending'
+      }
+    ];
   }
 
   // Update booking status
   async updateBookingStatus(bookingId: string, status: Booking['status']): Promise<Booking> {
-    return this.request<Booking>(`/api/bookings/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ bookingId, status }),
-    });
+    return {
+        id: bookingId, customerId: 'c1', pickupLocation: 'Colombo', destination: 'Kandy', 
+        date: '2026-05-02', price: 50, status
+    };
   }
 
   // Get driver stats
   async getDriverStats(driverId: string): Promise<DriverStats> {
-    return this.request<DriverStats>(`/api/drivers/${driverId}/stats`);
+    return { totalAssigned: 10, pendingRequests: 2, completedTrips: 8 };
   }
 
   // Update driver availability
   async updateDriverAvailability(driverId: string, available: boolean): Promise<void> {
-    return this.request<void>(`/api/drivers/${driverId}/availability`, {
-      method: 'PUT',
-      body: JSON.stringify({ available }),
-    });
+    return Promise.resolve();
   }
 
   // Get driver profile
   async getDriverProfile(driverId: string): Promise<DriverProfile> {
-    return this.request<DriverProfile>(`/api/drivers/${driverId}`);
+    return {
+      id: driverId, name: 'Sample Driver', phone: '1234567890', 
+      available: true, vehicleModel: 'Toyota Prius', vehiclePlate: 'ABC-1234'
+    };
   }
 
   // Get driver reviews
   async getDriverReviews(driverId: string): Promise<Review[]> {
-    return this.request<Review[]>(`/api/reviews/driver/${driverId}`);
+    return [];
   }
 
   // Update driver profile
   async updateDriverProfile(driverId: string, profile: Partial<DriverProfile>): Promise<DriverProfile> {
-    return this.request<DriverProfile>(`/api/drivers/${driverId}`, {
-      method: 'PUT',
-      body: JSON.stringify(profile),
-    });
+    return {
+      id: driverId, name: profile.name || 'Sample Driver', phone: profile.phone || '1234567890', 
+      available: profile.available ?? true, vehicleModel: 'Toyota Prius', vehiclePlate: 'ABC-1234'
+    };
   }
 }
 

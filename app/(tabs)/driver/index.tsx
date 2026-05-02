@@ -4,6 +4,7 @@ import { Booking, DriverProfile } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useRef, useState } from 'react';
+import { useDriverAuth } from '@/contexts/DriverAuthContext';
 import {
   Alert,
   Animated,
@@ -32,6 +33,7 @@ export default function DriverDashboardScreen() {
   const [activeTrip, setActiveTrip] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<DriverProfile | null>(null);
+  const { driver, logout } = useDriverAuth();
 
   const slideAnim = useRef(new Animated.Value(width)).current;
 
@@ -126,7 +128,7 @@ export default function DriverDashboardScreen() {
   const pendingBookings = (bookings || []).filter(b => b.status === 'pending');
   const completedTrips = (bookings || []).filter(b => b.status === 'completed').length;
   const totalAssigned = (bookings || []).length;
-  const driverName = profile?.name ?? 'John Doe';
+  const driverName = driver?.name || profile?.name || 'John Doe';
 
   const renderBookingCard = (booking: Booking) => (
     <View key={booking.id} style={styles.bookingCard}>
@@ -187,7 +189,7 @@ export default function DriverDashboardScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <View style={styles.overviewCard}>
           <View style={styles.headerRow}>
-            <View>
+            <View style={{ flex: 1, paddingRight: 10 }}>
               <Text style={styles.welcomeText}>Welcome back, {driverName}!</Text>
               <Text style={styles.subTitle}>Your driver dashboard is ready.</Text>
             </View>
@@ -209,7 +211,7 @@ export default function DriverDashboardScreen() {
           <View style={styles.availabilityContainer}>
             <View>
               <Text style={styles.availabilityLabel}>Available for rides</Text>
-              <Text style={styles.availabilityHint}>Toggle to receive booking requests.</Text>
+              <Text style={styles.availabilityHint}>Turn on to get new rides.</Text>
             </View>
             <Switch
               value={isAvailable}
@@ -222,8 +224,24 @@ export default function DriverDashboardScreen() {
 
         </View>
 
-        {/* Removed statsContainer and quickNavSection from here */}
-
+        {/* Dashboard Statistics */}
+        <View style={styles.dashboardStatsRow}>
+          <View style={styles.dashboardStatCard}>
+            <Ionicons name="document-text" size={24} color={Colors.primary} />
+            <Text style={styles.dashboardStatNumber}>{totalAssigned}</Text>
+            <Text style={styles.dashboardStatLabel} numberOfLines={1} adjustsFontSizeToFit>Assigned</Text>
+          </View>
+          <View style={styles.dashboardStatCard}>
+            <Ionicons name="time" size={24} color={Colors.secondary} />
+            <Text style={styles.dashboardStatNumber}>{pendingBookings.length}</Text>
+            <Text style={styles.dashboardStatLabel} numberOfLines={1} adjustsFontSizeToFit>Pending</Text>
+          </View>
+          <View style={styles.dashboardStatCard}>
+            <Ionicons name="checkmark-done" size={24} color="#00aa00" />
+            <Text style={styles.dashboardStatNumber}>{completedTrips}</Text>
+            <Text style={styles.dashboardStatLabel} numberOfLines={1} adjustsFontSizeToFit>Completed</Text>
+          </View>
+        </View>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Active Trip</Text>
           {activeTrip ? (
@@ -290,31 +308,6 @@ export default function DriverDashboardScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.sideMenuSectionTitle}>Statistics</Text>
-              <View style={styles.sideStatsContainer}>
-                <View style={styles.sideStatCard}>
-                  <Ionicons name="document-text" size={22} color={Colors.primary} style={styles.statIcon} />
-                  <View style={styles.sideStatText}>
-                    <Text style={styles.statNumber}>{totalAssigned}</Text>
-                    <Text style={styles.statLabel}>Assigned</Text>
-                  </View>
-                </View>
-                <View style={styles.sideStatCard}>
-                  <Ionicons name="time" size={22} color={Colors.primary} style={styles.statIcon} />
-                  <View style={styles.sideStatText}>
-                    <Text style={styles.statNumber}>{pendingBookings.length}</Text>
-                    <Text style={styles.statLabel}>Pending</Text>
-                  </View>
-                </View>
-                <View style={styles.sideStatCard}>
-                  <Ionicons name="checkmark-done" size={22} color={Colors.primary} style={styles.statIcon} />
-                  <View style={styles.sideStatText}>
-                    <Text style={styles.statNumber}>{completedTrips}</Text>
-                    <Text style={styles.statLabel}>Completed</Text>
-                  </View>
-                </View>
-              </View>
-
               <Text style={styles.sideMenuSectionTitle}>Quick Links</Text>
               <View style={styles.sideNavMenu}>
                 <TouchableOpacity style={styles.sideNavOption} onPress={() => { setShowQuickNavMenu(false); navigation.navigate('my-trips'); }}>
@@ -329,6 +322,13 @@ export default function DriverDashboardScreen() {
                   <Ionicons name="star" size={20} color={Colors.primary} />
                   <Text style={styles.sideNavText}>Reviews</Text>
                 </TouchableOpacity>
+                
+                <View style={{ marginTop: Spacing.xl }}>
+                  <TouchableOpacity style={styles.sideNavOption} onPress={() => { setShowQuickNavMenu(false); logout(); }}>
+                    <Ionicons name="log-out" size={20} color="#ff4444" />
+                    <Text style={[styles.sideNavText, { color: '#ff4444' }]}>Logout</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </ScrollView>
           </Animated.View>
@@ -396,11 +396,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.gray,
-    borderRadius: BorderRadius.md,
+    borderColor: Colors.grayLight,
+    borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    marginBottom: Spacing.lg,
-    backgroundColor: Colors.background,
+    marginTop: Spacing.md,
+  },
+  dashboardStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.xl,
+  },
+  dashboardStatCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xs,
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: Spacing.xs,
+    ...Shadows.card,
+  },
+  dashboardStatNumber: {
+    fontSize: FontSizes.xl,
+    fontFamily: Fonts.heading,
+    color: Colors.textDark,
+    marginTop: Spacing.xs,
+  },
+  dashboardStatLabel: {
+    fontSize: FontSizes.xs,
+    fontFamily: Fonts.body,
+    color: Colors.textLight,
+    marginTop: 2,
   },
   availabilityLabel: {
     fontSize: FontSizes.md,
