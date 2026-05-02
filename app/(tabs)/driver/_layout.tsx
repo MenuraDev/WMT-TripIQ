@@ -24,6 +24,7 @@ export default function DriverStackLayout() {
       <Stack.Screen name="my-trips" />
       <Stack.Screen name="profile" />
       <Stack.Screen name="reviews" />
+      <Stack.Screen name="vehicles" />
     </Stack>
   );
 }

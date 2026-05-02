@@ -25,12 +25,14 @@ interface DriverAuthContextType {
   register: (name: string, email: string, password: string, licenseNumber: string, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshDriver: () => Promise<void>;
+  token: string | null;
 }
 
 const DriverAuthContext = createContext<DriverAuthContextType | undefined>(undefined);
 
 export function DriverAuthProvider({ children }: { children: ReactNode }) {
   const [driver, setDriver] = useState<DriverUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load driver from storage on app start
@@ -41,10 +43,11 @@ export function DriverAuthProvider({ children }: { children: ReactNode }) {
   const loadStoredDriver = async () => {
     try {
       const storedDriver = await AsyncStorage.getItem('driver');
-      const token = await AsyncStorage.getItem('driverToken');
+      const storedToken = await AsyncStorage.getItem('driverToken');
 
-      if (storedDriver && token) {
+      if (storedDriver && storedToken) {
         setDriver(JSON.parse(storedDriver));
+        setToken(storedToken);
       }
     } catch (error) {
       console.error('Error loading stored driver:', error);
@@ -57,6 +60,7 @@ export function DriverAuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await driverAuthAPI.login(email, password);
       setDriver(response.driver);
+      setToken(response.token);
       await AsyncStorage.setItem('driver', JSON.stringify(response.driver));
       await AsyncStorage.setItem('driverToken', response.token);
     } catch (error: any) {
@@ -68,6 +72,7 @@ export function DriverAuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await driverAuthAPI.register({ name, email, password, licenseNumber, phone });
       setDriver(response.driver);
+      setToken(response.token);
       await AsyncStorage.setItem('driver', JSON.stringify(response.driver));
       await AsyncStorage.setItem('driverToken', response.token);
     } catch (error: any) {
@@ -77,6 +82,7 @@ export function DriverAuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     setDriver(null);
+    setToken(null);
     await AsyncStorage.removeItem('driver');
     await AsyncStorage.removeItem('driverToken');
   };
@@ -101,6 +107,7 @@ export function DriverAuthProvider({ children }: { children: ReactNode }) {
     register,
     logout,
     refreshDriver,
+    token,
   };
 
   return <DriverAuthContext.Provider value={value}>{children}</DriverAuthContext.Provider>;

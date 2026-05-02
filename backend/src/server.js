@@ -33,6 +33,7 @@ app.use('/api/driver-auth', require('./routes/driverAuth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/trips', require('./routes/trips'));
 app.use('/api/bookings', require('./routes/bookings'));
+app.use('/api/vehicles', require('./routes/vehicles'));
 //app.use('/api/reviews', require('./routes/reviews'));
 //app.use('/api/destinations', require('./routes/destinations'));
 

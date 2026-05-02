@@ -310,6 +310,10 @@ export default function DriverDashboardScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.sideMenuSectionTitle}>Quick Links</Text>
               <View style={styles.sideNavMenu}>
+                <TouchableOpacity style={styles.sideNavOption} onPress={() => { setShowQuickNavMenu(false); navigation.navigate('vehicles'); }}>
+                  <Ionicons name="car-sport" size={20} color={Colors.primary} />
+                  <Text style={styles.sideNavText}>My Vehicles</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.sideNavOption} onPress={() => { setShowQuickNavMenu(false); navigation.navigate('my-trips'); }}>
                   <Ionicons name="list" size={20} color={Colors.primary} />
                   <Text style={styles.sideNavText}>My Trips</Text>
