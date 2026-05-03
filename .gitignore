@@ -16,6 +16,9 @@ server/uploads/reviews/*
 
 Travel_System_Workflow_v2.md
 UI_Design_Prompt_v2_LightTheme.md
+System_Architecture_Generator.md
+Database_Schema_Generator.md
+API_Endpoint_Table.pdf
 
 *.log
 .DS_Store
