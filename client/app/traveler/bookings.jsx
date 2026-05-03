@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
@@ -37,6 +37,7 @@ export default function TravelerBookingsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [reviewsByBooking, setReviewsByBooking] = useState({});
+  const [deletingId, setDeletingId] = useState(null);
 
   const fetchBookings = useCallback(async ({ showLoader = false } = {}) => {
     try {
@@ -67,6 +68,34 @@ export default function TravelerBookingsScreen() {
     }, [fetchBookings])
   );
 
+  // Remove booking — deletes from database (only allowed when unpaid)
+  const removeBooking = (booking) => {
+    const tripTitle = booking.trip?.destinationArea || 'this trip';
+    Alert.alert(
+      'Remove booking?',
+      `This will permanently delete your booking for "${tripTitle}" and remove it from the database. This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeletingId(booking._id);
+              await api.delete(`/bookings/${booking._id}`);
+              setBookings((current) => current.filter((b) => b._id !== booking._id));
+              Alert.alert('Removed', 'Booking has been removed successfully.');
+            } catch (err) {
+              Alert.alert('Remove failed', err.response?.data?.message || 'Could not remove this booking.');
+            } finally {
+              setDeletingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderTab = (tab) => {
     const isActive = tab.label === 'Bookings';
     return (
@@ -90,11 +119,13 @@ export default function TravelerBookingsScreen() {
     const vehicleName = [item.vehicle?.brand, item.vehicle?.model].filter(Boolean).join(' ') || item.vehicle?.type || 'Vehicle';
     const tripTitle = item.trip?.destinationArea || 'Trip booking';
     const existingReview = reviewsByBooking[item._id];
+    const isPaid = item.paymentStatus === 'paid';
+    const isDeleting = deletingId === item._id;
 
     return (
       <View style={styles.bookingCard}>
         <View style={styles.cardHeader}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.tripTitle}>{tripTitle}</Text>
             <Text style={styles.dateText}>{formatDate(item.startDate)} - {formatDate(item.endDate)}</Text>
           </View>
@@ -138,6 +169,32 @@ export default function TravelerBookingsScreen() {
             ) : null}
           </View>
         </View>
+
+        {/* Remove booking button — only visible when NOT paid */}
+        {!isPaid && (
+          <TouchableOpacity
+            style={styles.removeButton}
+            onPress={() => removeBooking(item)}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <ActivityIndicator size="small" color="#DC2626" />
+            ) : (
+              <>
+                <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                <Text style={styles.removeButtonText}>Remove booking</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {/* Paid lock indicator */}
+        {isPaid && (
+          <View style={styles.paidLockBanner}>
+            <Ionicons name="lock-closed" size={14} color="#145C32" />
+            <Text style={styles.paidLockText}>Payment completed — booking is locked</Text>
+          </View>
+        )}
 
         {item.status === 'completed' ? (
           <TouchableOpacity style={styles.reviewButton} onPress={() => router.push(`/traveler/review/${item._id}`)}>
@@ -245,6 +302,15 @@ const createStyles = (theme) => StyleSheet.create({
   unpaidText: { color: '#92600A', fontSize: 11, fontFamily: 'Inter', fontWeight: '700', textTransform: 'capitalize' },
   openTripBtn: { flexDirection: 'row', alignItems: 'center' },
   openTripText: { color: theme.primary, fontSize: 12, fontFamily: 'Inter', fontWeight: '700', marginRight: 2 },
+
+  // Remove booking button (shown only when unpaid)
+  removeButton: { minHeight: 42, marginTop: 12, borderRadius: 10, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FFF0F0', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  removeButtonText: { color: '#DC2626', fontFamily: 'Inter', fontSize: 12, fontWeight: '700' },
+
+  // Paid lock banner (shown only when paid)
+  paidLockBanner: { marginTop: 12, borderRadius: 10, backgroundColor: '#EDFBF4', borderWidth: 1, borderColor: '#86EFAC', paddingVertical: 10, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  paidLockText: { color: '#145C32', fontFamily: 'Inter', fontSize: 11, fontWeight: '600' },
+
   reviewButton: { minHeight: 42, marginTop: 12, borderRadius: 10, backgroundColor: theme.amberLight, borderWidth: 1, borderColor: theme.amber, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   reviewButtonText: { color: theme.amberDark, fontFamily: 'Inter', fontSize: 12, fontWeight: '800' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
