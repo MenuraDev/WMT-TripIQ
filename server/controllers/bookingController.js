@@ -186,3 +186,65 @@ exports.updateBookingStatus = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
+
+// Traveler deletes (removes) their own booking — only allowed before payment
+exports.deleteBooking = async (req, res) => {
+  try {
+    const booking = await Booking.findOne({ _id: req.params.id, traveler: req.user.id })
+      .populate('trip', 'destinationArea')
+      .populate('vehicle', 'brand model type');
+
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+    // Block deletion if already paid
+    if (booking.paymentStatus === 'paid') {
+      return res.status(400).json({ message: 'Paid bookings cannot be removed. Contact support for a refund.' });
+    }
+
+    // Clean up any associated unpaid/pending payments
+    const Payment = require('../models/Payment');
+    await Payment.deleteMany({ booking: booking._id, status: { $nin: ['paid'] } });
+
+    // Reset trip status back to 'draft' so the traveler can re-book
+    if (booking.trip) {
+      const tripId = booking.trip._id || booking.trip;
+      await Trip.findByIdAndUpdate(tripId, { status: 'draft' });
+    }
+
+    const tripName = booking.trip?.destinationArea || 'a trip';
+    const driverId = booking.driver;
+
+    // Delete the booking from the database
+    await booking.deleteOne();
+
+    // Notify the driver
+    if (driverId) {
+      await createNotification({
+        recipient: driverId,
+        title: 'Booking removed',
+        message: `${req.user.name || 'A traveler'} removed their booking for ${tripName}.`,
+        type: 'booking',
+        priority: 'normal',
+        actionRoute: '/driver/home',
+        relatedModel: 'Booking',
+        relatedId: req.params.id,
+        metadata: { action: 'deleted' },
+      });
+    }
+
+    // Notify admins
+    await createNotificationsForAdmins({
+      title: 'Booking deleted',
+      message: `${req.user.name || 'A traveler'} deleted a booking for ${tripName}.`,
+      type: 'booking',
+      actionRoute: '/admin/home',
+      relatedModel: 'Booking',
+      relatedId: req.params.id,
+      metadata: { traveler: req.user.id, driver: driverId, action: 'deleted' },
+    });
+
+    res.status(200).json({ success: true, message: 'Booking removed successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
