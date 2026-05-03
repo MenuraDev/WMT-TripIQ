@@ -19,7 +19,6 @@ import {
 const tabs = [
   { label: 'Home', icon: 'home-outline', route: '/traveler/home' },
   { label: 'Trip', icon: 'map-outline', route: '/traveler/trips' },
-  { label: 'Bookings', icon: 'cart-outline', route: '/traveler/bookings' },
   { label: 'Payments', icon: 'card-outline', route: '/traveler/payments' },
   { label: 'Profile', icon: 'person', route: '/traveler/profile' },
 ];
