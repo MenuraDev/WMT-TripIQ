@@ -252,13 +252,23 @@ exports.deleteTrip = async (req, res) => {
     const trip = await Trip.findOne({ _id: req.params.id, user: req.user.id });
     if (!trip) return res.status(404).json({ message: 'Trip not found' });
 
-    const activeBooking = await Booking.findOne({
+    // Block deletion only if any booking for this trip is already paid
+    const paidBooking = await Booking.findOne({
       trip: trip._id,
-      status: { $in: ['pending', 'accepted'] },
+      paymentStatus: 'paid',
     });
 
-    if (activeBooking) {
-      return res.status(400).json({ message: 'Cannot remove a trip with pending or accepted bookings.' });
+    if (paidBooking) {
+      return res.status(400).json({ message: 'Cannot remove a trip that has a paid booking. Contact support for a refund first.' });
+    }
+
+    // Cascade delete: remove all unpaid bookings and their associated payments
+    const bookingsToDelete = await Booking.find({ trip: trip._id });
+    if (bookingsToDelete.length > 0) {
+      const bookingIds = bookingsToDelete.map((b) => b._id);
+      const Payment = require('../models/Payment');
+      await Payment.deleteMany({ booking: { $in: bookingIds }, status: { $nin: ['paid'] } });
+      await Booking.deleteMany({ _id: { $in: bookingIds } });
     }
 
     await trip.deleteOne();
