@@ -1,8 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
+import KeyboardAwareScrollView from '../../components/common/KeyboardAwareScrollView';
 
 const destinationSuggestions = ['Ella', 'Kandy', 'Galle', 'Nuwara Eliya', 'Mirissa', 'Anuradhapura'];
 const preferenceOptions = ['Beaches', 'Culture', 'Nature', 'Food', 'Adventure', 'Family', 'Budget', 'Photography'];
@@ -31,7 +32,7 @@ const formatDisplayDate = (value) => {
 
 export default function PlanTripScreen() {
   const router = useRouter();
-  const { tripId } = useLocalSearchParams();
+  const { tripId, destination } = useLocalSearchParams();
   const isEditing = !!tripId;
 
   const [step, setStep] = useState(1);
@@ -58,7 +59,10 @@ export default function PlanTripScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!tripId) return undefined;
+      if (!tripId) {
+        if (destination) setDestinationArea(String(destination));
+        return undefined;
+      }
 
       let isActive = true;
 
@@ -93,7 +97,7 @@ export default function PlanTripScreen() {
       return () => {
         isActive = false;
       };
-    }, [router, tripId])
+    }, [destination, router, tripId])
   );
 
   const togglePreference = (preference) => {
@@ -272,7 +276,7 @@ export default function PlanTripScreen() {
   );
 
   const renderStep1 = () => (
-    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <KeyboardAwareScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
       <Text style={styles.title}>{isEditing ? 'Edit saved plan' : 'Where should AI plan?'}</Text>
 
       <Text style={styles.inputLabel}>Destination area</Text>
@@ -326,11 +330,11 @@ export default function PlanTripScreen() {
       >
         <Text style={styles.primaryButtonText}>Next</Text>
       </TouchableOpacity>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 
   const renderStep2 = () => (
-    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <KeyboardAwareScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
       <Text style={styles.title}>{isEditing ? 'Update trip details' : 'Trip details'}</Text>
 
       <View style={styles.dateRow}>
@@ -412,7 +416,7 @@ export default function PlanTripScreen() {
       <TouchableOpacity style={styles.primaryButton} onPress={generateAIPlan}>
         <Text style={styles.primaryButtonText}>{isEditing ? 'Update saved trip plan' : 'Recommend places & build itinerary'}</Text>
       </TouchableOpacity>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 
   const renderStep3 = () => (
@@ -476,6 +480,7 @@ const styles = StyleSheet.create({
   stepLineFuture: { backgroundColor: '#E2E8F0' },
   stepLabelText: { fontSize: 13, color: '#475569', marginTop: 12, fontFamily: 'Inter', fontWeight: '500' },
   content: { flex: 1, paddingHorizontal: 16 },
+  scrollArea: { flex: 1 },
   scrollContent: { paddingBottom: 80 },
   title: { fontSize: 20, fontFamily: 'Inter', fontWeight: '600', color: '#0F172A', marginBottom: 16 },
   inputLabel: { fontSize: 14, fontFamily: 'Inter', fontWeight: '500', color: '#0F172A', marginBottom: 8, marginTop: 10 },

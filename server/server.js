@@ -1,4 +1,3 @@
-// server\server.js
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -36,6 +35,7 @@ const savedCardRoutes = require('./routes/savedCardRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const destinationRoutes = require('./routes/destinationRoutes');
 
 // Mount routes
 app.use('/api/auth', authRoutes);
@@ -47,6 +47,7 @@ app.use('/api/cards', savedCardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/destinations', destinationRoutes);
 
 // Error Handler Middleware
 app.use(errorHandler);

@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { themeOptions, useTheme } from '../../context/ThemeContext';
 import api from '../../services/api';
 import PasswordStrengthMeter from '../../components/common/PasswordStrengthMeter';
+import KeyboardAwareScrollView from '../../components/common/KeyboardAwareScrollView';
 import {
   normalizePhoneNumber,
   validateEmail,
@@ -28,6 +29,13 @@ const getInitials = (name) => {
   const parts = name.trim().split(' ');
   if (parts.length > 1) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
   return parts[0].slice(0, 2).toUpperCase();
+};
+
+const formatMemberSince = (value) => {
+  if (!value) return 'New';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'New';
+  return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 };
 
 export default function TravelerProfileScreen() {
@@ -279,7 +287,7 @@ export default function TravelerProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
@@ -296,16 +304,16 @@ export default function TravelerProfileScreen() {
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>12</Text>
-            <Text style={styles.statLabel}>Trips</Text>
+            <Text style={styles.statValue}>{user?.role === 'traveler' ? 'Traveler' : user?.role || 'User'}</Text>
+            <Text style={styles.statLabel}>Role</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>8</Text>
-            <Text style={styles.statLabel}>Destinations</Text>
+            <Text style={styles.statValue}>{user?.isActive === false ? 'Inactive' : 'Active'}</Text>
+            <Text style={styles.statLabel}>Status</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>4</Text>
-            <Text style={styles.statLabel}>Reviews</Text>
+            <Text style={styles.statValue}>{formatMemberSince(user?.createdAt)}</Text>
+            <Text style={styles.statLabel}>Member since</Text>
           </View>
         </View>
 
@@ -358,7 +366,7 @@ export default function TravelerProfileScreen() {
           <Ionicons name="log-out-outline" size={18} color={theme.error} />
           <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <View style={styles.bottomTabBar}>{tabs.map(renderTab)}</View>
     </View>
@@ -367,6 +375,7 @@ export default function TravelerProfileScreen() {
 
 const createStyles = (theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.bgPrimary },
+  scrollArea: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 58, paddingBottom: 96 },
   profileHeader: { alignItems: 'center', marginBottom: 18 },
   avatar: { width: 84, height: 84, borderRadius: 42, backgroundColor: theme.primaryLight, alignItems: 'center', justifyContent: 'center', position: 'relative' },
@@ -377,7 +386,7 @@ const createStyles = (theme) => StyleSheet.create({
   roleBadgeText: { color: theme.primaryDark, fontSize: 11, fontFamily: 'Inter', fontWeight: '700', marginLeft: 5 },
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: { flex: 1, borderWidth: 1, borderColor: theme.borderLight, backgroundColor: theme.bgSurface, borderRadius: 12, padding: 12, alignItems: 'center' },
-  statValue: { color: theme.textPrimary, fontSize: 20, fontFamily: 'Inter', fontWeight: '700' },
+  statValue: { color: theme.textPrimary, fontSize: 14, fontFamily: 'Inter', fontWeight: '700', minHeight: 24, textAlign: 'center', textAlignVertical: 'center' },
   statLabel: { color: theme.textMuted, fontSize: 11, fontFamily: 'Inter', marginTop: 3 },
   sectionLabel: { color: theme.textMuted, fontSize: 11, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
   card: { borderWidth: 1, borderColor: theme.borderLight, backgroundColor: theme.bgPrimary, borderRadius: 14, overflow: 'hidden', marginBottom: 16 },

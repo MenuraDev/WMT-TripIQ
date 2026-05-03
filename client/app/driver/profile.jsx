@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { themeOptions, useTheme } from '../../context/ThemeContext';
 import api from '../../services/api';
 import PasswordStrengthMeter from '../../components/common/PasswordStrengthMeter';
+import KeyboardAwareScrollView from '../../components/common/KeyboardAwareScrollView';
 import {
   normalizePhoneNumber,
   validateEmail,
@@ -27,6 +28,11 @@ const getInitials = (name) => {
   const parts = name.trim().split(' ');
   if (parts.length > 1) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
   return parts[0].slice(0, 2).toUpperCase();
+};
+
+const formatDriverRating = (value) => {
+  const rating = Number(value || 0);
+  return rating > 0 ? rating.toFixed(1) : 'New';
 };
 
 export default function DriverProfileScreen() {
@@ -281,7 +287,7 @@ export default function DriverProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
@@ -298,16 +304,16 @@ export default function DriverProfileScreen() {
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>156</Text>
-            <Text style={styles.statLabel}>Trips</Text>
+            <Text style={styles.statValue}>{user?.isVerified ? 'Verified' : 'Pending'}</Text>
+            <Text style={styles.statLabel}>Verification</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValueMono}>LKR 1.2M</Text>
-            <Text style={styles.statLabel}>Earned</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{Number(user?.rating || 4.8).toFixed(1)}</Text>
+            <Text style={styles.statValue}>{formatDriverRating(user?.rating)}</Text>
             <Text style={styles.statLabel}>Rating</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{Number(user?.totalRatings || 0)}</Text>
+            <Text style={styles.statLabel}>Reviews</Text>
           </View>
         </View>
 
@@ -361,7 +367,7 @@ export default function DriverProfileScreen() {
           <Ionicons name="log-out-outline" size={18} color={theme.error} />
           <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <View style={styles.bottomTabBar}>{tabs.map(renderTab)}</View>
     </View>
@@ -370,6 +376,7 @@ export default function DriverProfileScreen() {
 
 const createStyles = (theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.bgPrimary },
+  scrollArea: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 58, paddingBottom: 96 },
   profileHeader: { alignItems: 'center', marginBottom: 18 },
   avatar: { width: 84, height: 84, borderRadius: 42, backgroundColor: theme.primaryLight, alignItems: 'center', justifyContent: 'center', position: 'relative' },
@@ -380,7 +387,7 @@ const createStyles = (theme) => StyleSheet.create({
   roleBadgeText: { color: theme.primaryDark, fontSize: 11, fontFamily: 'Inter', fontWeight: '700', marginLeft: 5 },
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: { flex: 1, borderWidth: 1, borderColor: theme.borderLight, backgroundColor: theme.bgSurface, borderRadius: 12, padding: 12, alignItems: 'center' },
-  statValue: { color: theme.textPrimary, fontSize: 20, fontFamily: 'Inter', fontWeight: '700' },
+  statValue: { color: theme.textPrimary, fontSize: 14, fontFamily: 'Inter', fontWeight: '700', minHeight: 24, textAlign: 'center', textAlignVertical: 'center' },
   statValueMono: { color: theme.textPrimary, fontSize: 13, fontFamily: 'monospace', fontWeight: '700', minHeight: 24, textAlignVertical: 'center' },
   statLabel: { color: theme.textMuted, fontSize: 11, fontFamily: 'Inter', marginTop: 3 },
   sectionLabel: { color: theme.textMuted, fontSize: 11, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
