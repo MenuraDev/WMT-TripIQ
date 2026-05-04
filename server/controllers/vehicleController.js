@@ -42,7 +42,15 @@ exports.addVehicle = async (req, res) => {
     // Handle Multer payload
     const images = [];
     if (req.file) {
-      images.push(req.file.path);
+      let imagePath = req.file.path;
+      if (!imagePath.startsWith('http')) {
+        const normalizedPath = imagePath.replace(/\\/g, '/');
+        const uploadIndex = normalizedPath.indexOf('/uploads/');
+        if (uploadIndex !== -1) {
+          imagePath = `${req.protocol}://${req.get('host')}${normalizedPath.substring(uploadIndex)}`;
+        }
+      }
+      images.push(imagePath);
     }
 
     const vehicle = await Vehicle.create({
@@ -91,7 +99,6 @@ exports.getVehicleById = async (req, res) => {
   try {
     const vehicle = await Vehicle.findOne({ _id: req.params.id, driver: req.user.id });
     if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
-    const previousImages = [...(vehicle.images || [])];
 
     res.status(200).json({ success: true, vehicle });
   } catch (error) {
@@ -107,6 +114,8 @@ exports.updateVehicle = async (req, res) => {
     const vehicle = await Vehicle.findOne({ _id: req.params.id, driver: req.user.id });
     if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
 
+    const previousImages = [...(vehicle.images || [])];
+
     const normalizedRegNumber = regNumber.trim().toUpperCase();
     const exists = await Vehicle.findOne({ regNumber: normalizedRegNumber, _id: { $ne: vehicle._id } });
     if (exists) return res.status(400).json({ message: 'Vehicle registration number already in use' });
@@ -119,12 +128,20 @@ exports.updateVehicle = async (req, res) => {
     vehicle.pricePerDay = Number(pricePerDay);
 
     if (req.file) {
-      vehicle.images = [req.file.path];
+      let imagePath = req.file.path;
+      if (!imagePath.startsWith('http')) {
+        const normalizedPath = imagePath.replace(/\\/g, '/');
+        const uploadIndex = normalizedPath.indexOf('/uploads/');
+        if (uploadIndex !== -1) {
+          imagePath = `${req.protocol}://${req.get('host')}${normalizedPath.substring(uploadIndex)}`;
+        }
+      }
+      vehicle.images = [imagePath];
     }
 
     await vehicle.save();
     if (req.file) {
-      await deleteCloudinaryAssets(previousImages.filter((image) => image !== req.file.path));
+      await deleteCloudinaryAssets(previousImages.filter((image) => image !== vehicle.images[0]));
     }
     res.status(200).json({ success: true, vehicle });
   } catch (error) {
