@@ -79,7 +79,7 @@ export default function BookVehicleScreen() {
         vehicleId: selectedVehicle._id,
       });
       Alert.alert('Request sent', 'Your booking request was sent to the driver.', [
-        { text: 'View trips', onPress: () => router.replace('/traveler/trips') },
+        { text: 'View bookings', onPress: () => router.replace('/traveler/bookings') },
       ]);
     } catch (error) {
       Alert.alert('Booking failed', error.response?.data?.message || 'Please try another vehicle.');

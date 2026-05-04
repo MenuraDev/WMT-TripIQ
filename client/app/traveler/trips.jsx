@@ -8,6 +8,7 @@ import { useTheme } from '../../context/ThemeContext';
 const tabs = [
   { label: 'Home', icon: 'home-outline', route: '/traveler/home' },
   { label: 'Trip', icon: 'map', route: '/traveler/trips' },
+  { label: 'Bookings', icon: 'cart-outline', route: '/traveler/bookings' },
   { label: 'Payments', icon: 'card-outline', route: '/traveler/payments' },
   { label: 'Profile', icon: 'person-outline', route: '/traveler/profile' },
 ];
