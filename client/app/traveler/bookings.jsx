@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
@@ -46,7 +46,8 @@ export default function TravelerBookingsScreen() {
         api.get('/bookings/my-bookings'),
         api.get('/reviews/my'),
       ]);
-      setBookings(bookingRes.data.bookings || []);
+      const allBookings = bookingRes.data.bookings || [];
+      setBookings(allBookings.filter((b) => !['cancelled', 'rejected'].includes(b.status)));
       const reviewMap = {};
       (reviewRes.data?.reviews || []).forEach((review) => {
         const bookingId = review.booking?._id || review.booking;
@@ -66,6 +67,31 @@ export default function TravelerBookingsScreen() {
       fetchBookings({ showLoader: true });
     }, [fetchBookings])
   );
+
+  const cancelBooking = (item) => {
+    const tripTitle = item.trip?.destinationArea || 'this trip';
+    Alert.alert(
+      'Cancel booking?',
+      `This will cancel your vehicle booking for ${tripTitle}. The driver will be notified.`,
+      [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: 'Cancel booking',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.put(`/bookings/${item._id}/cancel`);
+              // CASCADE: Backend now deletes the booking and trip, so remove from local list
+              setBookings((current) => current.filter((b) => b._id !== item._id));
+              Alert.alert('Removed', 'Your booking and associated trip have been removed.');
+            } catch (err) {
+              Alert.alert('Action failed', err.response?.data?.message || 'Could not remove this booking.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const renderTab = (tab) => {
     const isActive = tab.label === 'Bookings';
@@ -90,6 +116,7 @@ export default function TravelerBookingsScreen() {
     const vehicleName = [item.vehicle?.brand, item.vehicle?.model].filter(Boolean).join(' ') || item.vehicle?.type || 'Vehicle';
     const tripTitle = item.trip?.destinationArea || 'Trip booking';
     const existingReview = reviewsByBooking[item._id];
+    const canCancel = item.paymentStatus !== 'paid' && !['cancelled', 'rejected', 'completed'].includes(item.status);
 
     return (
       <View style={styles.bookingCard}>
@@ -138,6 +165,13 @@ export default function TravelerBookingsScreen() {
             ) : null}
           </View>
         </View>
+
+        {canCancel ? (
+          <TouchableOpacity style={styles.cancelButton} onPress={() => cancelBooking(item)}>
+            <Ionicons name="close-circle-outline" size={17} color="#DC2626" />
+            <Text style={styles.cancelButtonText}>Cancel booking</Text>
+          </TouchableOpacity>
+        ) : null}
 
         {item.status === 'completed' ? (
           <TouchableOpacity style={styles.reviewButton} onPress={() => router.push(`/traveler/review/${item._id}`)}>
@@ -245,6 +279,8 @@ const createStyles = (theme) => StyleSheet.create({
   unpaidText: { color: '#92600A', fontSize: 11, fontFamily: 'Inter', fontWeight: '700', textTransform: 'capitalize' },
   openTripBtn: { flexDirection: 'row', alignItems: 'center' },
   openTripText: { color: theme.primary, fontSize: 12, fontFamily: 'Inter', fontWeight: '700', marginRight: 2 },
+  cancelButton: { minHeight: 42, marginTop: 12, borderRadius: 10, backgroundColor: '#FFF0F0', borderWidth: 1, borderColor: '#FECACA', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  cancelButtonText: { color: '#DC2626', fontFamily: 'Inter', fontSize: 12, fontWeight: '700' },
   reviewButton: { minHeight: 42, marginTop: 12, borderRadius: 10, backgroundColor: theme.amberLight, borderWidth: 1, borderColor: theme.amber, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   reviewButtonText: { color: theme.amberDark, fontFamily: 'Inter', fontSize: 12, fontWeight: '800' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center' },

@@ -324,8 +324,8 @@ export default function PlanTripScreen() {
       </View>
 
       <TouchableOpacity
-        style={[styles.primaryButton, !destinationArea.trim() && styles.disabledButton]}
-        disabled={!destinationArea.trim()}
+        style={[styles.primaryButton, (!destinationArea.trim() || !startingPoint.trim()) && styles.disabledButton]}
+        disabled={!destinationArea.trim() || !startingPoint.trim()}
         onPress={() => setStep(2)}
       >
         <Text style={styles.primaryButtonText}>Next</Text>
@@ -413,7 +413,11 @@ export default function PlanTripScreen() {
         multiline
       />
 
-      <TouchableOpacity style={styles.primaryButton} onPress={generateAIPlan}>
+      <TouchableOpacity 
+        style={[styles.primaryButton, (!startDate || !endDate || !budget || !!getDateValidationError()) && styles.disabledButton]} 
+        disabled={!startDate || !endDate || !budget || !!getDateValidationError()}
+        onPress={generateAIPlan}
+      >
         <Text style={styles.primaryButtonText}>{isEditing ? 'Update saved trip plan' : 'Recommend places & build itinerary'}</Text>
       </TouchableOpacity>
     </KeyboardAwareScrollView>
