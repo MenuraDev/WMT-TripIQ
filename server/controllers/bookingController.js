@@ -1,6 +1,7 @@
 const Booking = require('../models/Booking');
 const Vehicle = require('../models/Vehicle');
 const Trip = require('../models/Trip');
+const Payment = require('../models/Payment');
 const { createNotification, createNotificationsForAdmins } = require('../utils/notifications');
 
 // Traveler submits booking request
@@ -180,8 +181,73 @@ exports.updateBookingStatus = async (req, res) => {
       relatedId: booking._id,
       metadata: { bookingStatus: status, traveler: booking.traveler, driver: req.user.id },
     });
+
+    // CASCADE: If rejected, delete the trip
+    if (status === 'rejected') {
+      const tripId = booking.trip._id || booking.trip;
+      await Trip.findByIdAndDelete(tripId);
+      
+      // Also notify the traveler that the trip was deleted because driver rejected
+      await createNotification({
+        recipient: booking.traveler,
+        title: 'Trip deleted',
+        message: `Your trip to ${booking.trip?.destinationArea || 'your destination'} was removed because the driver declined the request.`,
+        type: 'trip',
+        priority: 'high',
+        actionRoute: '/traveler/trips',
+      });
+    }
     
     res.status(200).json({ success: true, booking });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// Traveler cancels a booking (allowed only before payment)
+exports.cancelBooking = async (req, res) => {
+  try {
+    const booking = await Booking.findOne({ _id: req.params.id, traveler: req.user.id })
+      .populate('trip', 'destinationArea')
+      .populate('vehicle', 'brand model type');
+
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+    // Block cancellation if the booking has been paid
+    if (booking.paymentStatus === 'paid') {
+      return res.status(400).json({ message: 'Cannot cancel a paid booking. Request a refund instead.' });
+    }
+
+    // Already cancelled or rejected
+    if (['cancelled', 'rejected'].includes(booking.status)) {
+      return res.status(400).json({ message: 'This booking is already cancelled or rejected.' });
+    }
+
+    const tripId = booking.trip?._id || booking.trip;
+    
+    // Notify the driver BEFORE deleting trip context
+    await createNotification({
+      recipient: booking.driver,
+      title: 'Booking cancelled by traveler',
+      message: `${req.user.name || 'The traveler'} cancelled the booking and the trip to ${booking.trip?.destinationArea || 'a trip'} was removed.`,
+      type: 'booking',
+      priority: 'high',
+      actionRoute: '/driver/home',
+      relatedModel: 'Booking',
+      relatedId: booking._id,
+      metadata: { bookingStatus: 'cancelled' },
+    });
+
+    // CASCADE: Delete the trip and the booking
+    if (tripId) {
+      await Trip.findByIdAndDelete(tripId);
+    }
+    await booking.deleteOne();
+
+    // Delete any pending (unpaid) payment records for this booking
+    await Payment.deleteMany({ booking: booking._id, status: { $ne: 'paid' } });
+
+    res.status(200).json({ success: true, message: 'Booking and associated trip removed successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }

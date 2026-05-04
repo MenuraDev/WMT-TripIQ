@@ -1,5 +1,6 @@
 const Trip = require('../models/Trip');
 const Booking = require('../models/Booking');
+const Payment = require('../models/Payment');
 const Groq = require('groq-sdk');
 const { createNotification, createNotificationsForAdmins } = require('../utils/notifications');
 
@@ -252,17 +253,117 @@ exports.deleteTrip = async (req, res) => {
     const trip = await Trip.findOne({ _id: req.params.id, user: req.user.id });
     if (!trip) return res.status(404).json({ message: 'Trip not found' });
 
-    const activeBooking = await Booking.findOne({
+    // Block deletion only if any booking for this trip has been paid
+    const paidBooking = await Booking.findOne({
       trip: trip._id,
-      status: { $in: ['pending', 'accepted'] },
+      paymentStatus: 'paid',
     });
 
-    if (activeBooking) {
-      return res.status(400).json({ message: 'Cannot remove a trip with pending or accepted bookings.' });
+    if (paidBooking) {
+      return res.status(400).json({ message: 'Cannot remove a trip that has been paid for. Request a refund first.' });
+    }
+
+    // CASCADE: Delete any unpaid bookings and notify the drivers
+    const bookingsToDelete = await Booking.find({
+      trip: trip._id,
+      paymentStatus: { $ne: 'paid' },
+    });
+
+    for (const booking of bookingsToDelete) {
+      // Notify the driver before deleting
+      await createNotification({
+        recipient: booking.driver,
+        title: 'Booking removed',
+        message: `${req.user.name || 'The traveler'} removed the trip to ${trip.destinationArea || 'a destination'} and the booking was deleted.`,
+        type: 'booking',
+        priority: 'high',
+        actionRoute: '/driver/home',
+      });
+
+      // Delete the booking
+      await booking.deleteOne();
+
+      // Delete any pending (unpaid) payment records for this booking
+      await Payment.deleteMany({ booking: booking._id, status: { $ne: 'paid' } });
     }
 
     await trip.deleteOne();
     res.status(200).json({ success: true, message: 'Trip removed successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+exports.updateTrip = async (req, res) => {
+  try {
+    const trip = await Trip.findOne({ _id: req.params.id, user: req.user.id });
+    if (!trip) return res.status(404).json({ message: 'Trip not found' });
+
+    // Block editing if any booking for this trip has been paid
+    const paidBooking = await Booking.findOne({
+      trip: trip._id,
+      paymentStatus: 'paid',
+    });
+
+    if (paidBooking) {
+      return res.status(400).json({ message: 'Cannot edit a trip that has been paid for.' });
+    }
+
+    // Update allowed fields
+    const editableFields = [
+      'destinationArea', 'startingPoint', 'startDate', 'endDate',
+      'budget', 'passengers', 'tripType', 'pace', 'preferences', 'constraints'
+    ];
+
+    editableFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        trip[field] = req.body[field];
+      }
+    });
+
+    await trip.save();
+
+    // If a driver has already accepted a booking for this trip, notify them
+    const acceptedBookings = await Booking.find({
+      trip: trip._id,
+      status: 'accepted',
+    });
+
+    for (const booking of acceptedBookings) {
+      await createNotification({
+        recipient: booking.driver,
+        title: 'Trip plan updated',
+        message: `${req.user.name || 'The traveler'} updated the trip plan for ${trip.destinationArea || 'a destination'}. Please review the changes.`,
+        type: 'trip',
+        priority: 'high',
+        actionRoute: '/driver/home',
+        relatedModel: 'Trip',
+        relatedId: trip._id,
+        metadata: { bookingId: booking._id, tripUpdated: true },
+      });
+    }
+
+    // Also notify drivers with pending bookings
+    const pendingBookings = await Booking.find({
+      trip: trip._id,
+      status: 'pending',
+    });
+
+    for (const booking of pendingBookings) {
+      await createNotification({
+        recipient: booking.driver,
+        title: 'Trip plan updated',
+        message: `${req.user.name || 'The traveler'} updated the trip plan for ${trip.destinationArea || 'a destination'}. The booking request details may have changed.`,
+        type: 'trip',
+        priority: 'normal',
+        actionRoute: '/driver/home',
+        relatedModel: 'Trip',
+        relatedId: trip._id,
+        metadata: { bookingId: booking._id, tripUpdated: true },
+      });
+    }
+
+    res.status(200).json({ success: true, trip });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
@@ -370,6 +471,16 @@ exports.regenerateAITripPlan = async (req, res) => {
     const trip = await Trip.findOne({ _id: req.params.id, user: req.user.id });
     if (!trip) return res.status(404).json({ message: 'Trip not found' });
 
+    // Block regeneration if trip has been paid for
+    const paidBooking = await Booking.findOne({
+      trip: trip._id,
+      paymentStatus: 'paid',
+    });
+
+    if (paidBooking) {
+      return res.status(400).json({ message: 'Cannot edit a trip that has been paid for.' });
+    }
+
     const inputs = {
       destinationArea: req.body.destinationArea || trip.destinationArea,
       startingPoint: req.body.startingPoint || trip.startingPoint,
@@ -409,6 +520,46 @@ exports.regenerateAITripPlan = async (req, res) => {
       relatedId: trip._id,
       metadata: { destinationArea: trip.destinationArea },
     });
+
+    // Notify drivers with accepted bookings about the plan change
+    const acceptedBookings = await Booking.find({
+      trip: trip._id,
+      status: 'accepted',
+    });
+
+    for (const booking of acceptedBookings) {
+      await createNotification({
+        recipient: booking.driver,
+        title: 'Trip plan changed',
+        message: `${req.user.name || 'The traveler'} regenerated the AI plan for ${trip.destinationArea || 'a trip'}. The itinerary and details may have changed.`,
+        type: 'trip',
+        priority: 'high',
+        actionRoute: '/driver/home',
+        relatedModel: 'Trip',
+        relatedId: trip._id,
+        metadata: { bookingId: booking._id, tripRegenerated: true },
+      });
+    }
+
+    // Also notify drivers with pending bookings
+    const pendingBookings = await Booking.find({
+      trip: trip._id,
+      status: 'pending',
+    });
+
+    for (const booking of pendingBookings) {
+      await createNotification({
+        recipient: booking.driver,
+        title: 'Trip plan changed',
+        message: `${req.user.name || 'The traveler'} regenerated the AI plan for ${trip.destinationArea || 'a trip'}. The booking request details may have changed.`,
+        type: 'trip',
+        priority: 'normal',
+        actionRoute: '/driver/home',
+        relatedModel: 'Trip',
+        relatedId: trip._id,
+        metadata: { bookingId: booking._id, tripRegenerated: true },
+      });
+    }
 
     res.status(200).json({ success: true, trip, aiPlan });
   } catch (error) {

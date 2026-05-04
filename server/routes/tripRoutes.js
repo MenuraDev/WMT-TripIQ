@@ -5,6 +5,7 @@ const {
   getMyTrips, 
   getTripById, 
   deleteTrip,
+  updateTrip,
   generateAITripPlan,
   getAITripPlan,
   regenerateAITripPlan
@@ -20,6 +21,7 @@ router.post('/ai-plan', generateAITripPlan);
 router.get('/my', getMyTrips);
 router.get('/:id/ai-plan', getAITripPlan);
 router.get('/:id', getTripById);
+router.put('/:id', updateTrip);
 router.post('/:id/regenerate-ai-plan', regenerateAITripPlan);
 router.delete('/:id', deleteTrip);
 
